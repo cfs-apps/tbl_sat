@@ -1,0 +1,30 @@
+{
+   "title": "Raspberry Pi Table Sat initialization file",
+   "description": [ "Define runtime configurations",
+                    "See app_cfg.h for GPIO pin definitions"],
+   "config": {
+      
+      "APP_CFE_NAME": "TBL_SAT",
+      "APP_PERF_ID":  129,
+      
+      "APP_CMD_PIPE_NAME":  "TBL_SAT_CMD",
+      "APP_CMD_PIPE_DEPTH": 5,
+      
+      "TBL_SAT_CMD_TOPICID"    : 0,
+      "BC_SCH_1_SEC_TOPICID"   : 0,
+      "TBL_SAT_HK_TLM_TOPICID" : 0,
+
+      "CHILD_NAME":       "TBL_SAT_CHILD",
+      "CHILD_PERF_ID":    44,
+      "CHILD_STACK_SIZE": 16384,
+      "CHILD_PRIORITY":   20,
+      
+      "I2C_SDA_PIN": 2,
+      "I2C_SCL_PIN": 3
+
+      "FAN_1_PWM_PIN":  18,
+      "FAN_1_TACH_PIN": 24,
+      "FAN_2_PWM_PIN":  19,
+      "FAN_2_TACH_PIN": 26,
+  }
+}

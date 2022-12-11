@@ -1,0 +1,32 @@
+{
+
+   "app": {
+   
+   "title": "TBL_SAT",
+   "version": "1.0.0",
+   "supplier": "Open STEMware",
+   "copyright": "bitValence",
+   "url": "https://github.com/cfs-apps/tbl_sat",
+
+   "description": [
+      "Raspberry Pi app for teh Table Sat project." 
+   ],
+
+   "cfs": {
+      "cfe-type": "CFE_APP",
+      "obj-file": "tbl_sat",
+      "entry-symbol": "TBL_SAT_AppMain",
+      "name": "GPIO_DEMO",
+      "priority": 70,
+      "stack": 32768,
+      "load_addr": 0,
+      "exception-action": 0,
+      "app-framework": "osk",
+      "tables": ["tbl_sat_ini.json"]
+   },
+
+   "requires": ["osk_c_fw", "pi_iolib"]
+
+}}
+
+
