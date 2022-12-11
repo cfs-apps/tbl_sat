@@ -22,12 +22,12 @@
       "SAT_CTRL_PERIOD":  500, 
       "SAT_CTRL_TBL_DEF": "/cf/sat_ctrl_tbl.json",
       
-      "I2C_SDA_PIN": 2,
-      "I2C_SCL_PIN": 3,
+      "I2C_SDA_BCM_ID": 2,
+      "I2C_SCL_BCM_ID": 3,
 
-      "FAN_1_PWM_PIN":  18,
-      "FAN_1_TACH_PIN": 24,
-      "FAN_2_PWM_PIN":  19,
-      "FAN_2_TACH_PIN": 26
+      "FAN_1_PWM_BCM_ID":  18,
+      "FAN_1_TACH_BCM_ID": 24,
+      "FAN_2_PWM_BCM_ID":  19,
+      "FAN_2_TACH_BCM_ID": 26
   }
 }
