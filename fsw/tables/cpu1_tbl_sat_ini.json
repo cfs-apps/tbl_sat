@@ -10,21 +10,24 @@
       "APP_CMD_PIPE_NAME":  "TBL_SAT_CMD",
       "APP_CMD_PIPE_DEPTH": 5,
       
-      "TBL_SAT_CMD_TOPICID"    : 0,
-      "BC_SCH_1_SEC_TOPICID"   : 0,
-      "TBL_SAT_HK_TLM_TOPICID" : 0,
+      "TBL_SAT_CMD_TOPICID": 6245,
+      "BC_SCH_1_HZ_TOPICID": 6224,
+      "TBL_SAT_STATUS_TLM_TOPICID": 2161,
 
       "CHILD_NAME":       "TBL_SAT_CHILD",
       "CHILD_PERF_ID":    44,
       "CHILD_STACK_SIZE": 16384,
       "CHILD_PRIORITY":   20,
       
+      "SAT_CTRL_PERIOD":  500, 
+      "SAT_CTRL_TBL_DEF": "/cf/sat_ctrl_tbl.json",
+      
       "I2C_SDA_PIN": 2,
-      "I2C_SCL_PIN": 3
+      "I2C_SCL_PIN": 3,
 
       "FAN_1_PWM_PIN":  18,
       "FAN_1_TACH_PIN": 24,
       "FAN_2_PWM_PIN":  19,
-      "FAN_2_TACH_PIN": 26,
+      "FAN_2_TACH_PIN": 26
   }
 }

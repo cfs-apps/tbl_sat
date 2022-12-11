@@ -205,7 +205,7 @@ static int32 InitApp(void)
       CMDMGR_RegisterFunc(CMDMGR_OBJ, CMDMGR_NOOP_CMD_FC,   NULL, TBL_SAT_NoOpCmd,     0);
       CMDMGR_RegisterFunc(CMDMGR_OBJ, CMDMGR_RESET_CMD_FC,  NULL, TBL_SAT_ResetAppCmd, 0);
 
-OS_printf("sizeof(TBL_SAT_SetCtrlMode_Payload_t)=%ld\n", sizeof(TBL_SAT_SetCtrlMode_Payload_t));
+OS_printf("sizeof(TBL_SAT_SetCtrlMode_Payload_t)=%d\n", (uint32)sizeof(TBL_SAT_SetCtrlMode_Payload_t));
       CMDMGR_RegisterFunc(CMDMGR_OBJ, TBL_SAT_SET_CTRL_MODE_CC,  SAT_CTRL_OBJ, SAT_CTRL_SetModeCmd,  2); //sizeof(TBL_SAT_SetCtrlMode_Payload_t));
       
       CFE_MSG_Init(CFE_MSG_PTR(TblSat.StatusTlm.TelemetryHeader), CFE_SB_ValueToMsgId(INITBL_GetIntConfig(INITBL_OBJ, CFG_TBL_SAT_STATUS_TLM_TOPICID)), sizeof(TBL_SAT_StatusTlm_t));

@@ -16,13 +16,13 @@
       "cfe-type": "CFE_APP",
       "obj-file": "tbl_sat",
       "entry-symbol": "TBL_SAT_AppMain",
-      "name": "GPIO_DEMO",
+      "name": "TBL_SAT",
       "priority": 70,
       "stack": 32768,
       "load_addr": 0,
       "exception-action": 0,
       "app-framework": "osk",
-      "tables": ["tbl_sat_ini.json"]
+      "tables": ["tbl_sat_ini.json", "sat_ctrl_tbl.json"]
    },
 
    "requires": ["osk_c_fw", "pi_iolib"]

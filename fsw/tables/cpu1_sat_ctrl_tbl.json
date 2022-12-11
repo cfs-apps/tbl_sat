@@ -2,10 +2,7 @@
    "title": "Raspberry Pi Table Sat Control Paramaters",
    "description": [ "",
                     "See app_cfg.h for details"],
-   "config": {
-      
-      "test-steps": 10,
-      "test-time-in-steps": 10
-      
-  }
+   "test-steps": 5,
+   "test-time-in-step": 10
+
 }
