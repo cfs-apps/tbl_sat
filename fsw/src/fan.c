@@ -47,6 +47,7 @@ static FAN_Class_t *Fan = NULL;
 /** Local Function Prototypes **/
 /*******************************/
 
+static void ConfigPwm(FAN_Struct_t *FanObj, TBL_SAT_FanId_Enum_t FanId, int Channel);
 
 /******************************************************************************
 ** Function: FAN_Constructor
@@ -73,28 +74,16 @@ void FAN_Constructor(FAN_Class_t *FanPtr, INITBL_Class_t *IniTbl)
    if (gpio_map() < 0 || pwm_map() < 0) // map peripherals
    {
    
-      CFE_EVS_SendEvent (FAN_CONSTRUCTOR_EID, CFE_EVS_EventType_ERROR, 
-                         "GPIO or PWM mapping failed");
       Fan->IoMapped = false;
+      CFE_EVS_SendEvent (FAN_CONSTRUCTOR_EID, CFE_EVS_EventType_ERROR, 
+                         "GPIO or PWM mapping failed. Verify chip selection in pi_iolib config.h");
 
    }
    else
    {
-      Fan->IoMapped = true;  
-      gpio_func(Fan->One.PwmBcmId, ALT5); // Alternate function 5 is PWM
-
-      // TODO - Document this mess      
-      Fan->One.PwmChanCfg.pwm_register.pwm_bitfield.mode = PWM_CTL_MODE_PWM;
-      Fan->One.PwmChanCfg.pwm_register.pwm_bitfield.rptl = PWM_RPTL_STOP;
-      Fan->One.PwmChanCfg.pwm_register.pwm_bitfield.sbit = PWM_SBIT_LOW;
-      Fan->One.PwmChanCfg.pwm_register.pwm_bitfield.pola = PWM_POLA_DEFAULT;
-      Fan->One.PwmChanCfg.pwm_register.pwm_bitfield.usef = PWM_USEF_DATA;
-      Fan->One.PwmChanCfg.pwm_register.pwm_bitfield.msen = PWM_MSEN_MSRATIO;
-      Fan->One.PwmChanCfg.divisor = 1953;
-      Fan->One.PwmChanCfg.range   = 5120;
-
-      pwm_configure(PWM_CHANNEL0, &Fan->One.PwmChanCfg);
-      pwm_enable(PWM_CHANNEL0);
+      Fan->IoMapped = true;
+      ConfigPwm(&Fan->One, TBL_SAT_FanId_1, PWM_CHANNEL0);
+      ConfigPwm(&Fan->Two, TBL_SAT_FanId_2, PWM_CHANNEL1);
 
    } /* End if IO mapped */
     
@@ -150,9 +139,42 @@ bool FAN_SetPwm(TBL_SAT_FanId_Enum_t FanId, uint16 Pwm)
    else
    {
       Fan->Two.PwmCmd = LimitedPwm;
+      if (Fan->IoMapped)
+      {         
+         DAT_CHANNEL1 = Fan->Two.PwmCmd;
+      }
    }   
    
    return Limited;
    
 } /* End FAN_SetPwm() */
 
+/******************************************************************************
+** Function: ConfigPwm
+**
+** Notes:
+**   1. TODO - Document magic numbers
+**
+*/
+static void ConfigPwm(FAN_Struct_t *FanObj, TBL_SAT_FanId_Enum_t FanId, int Channel)
+{
+
+      gpio_func(FanObj->PwmBcmId, ALT5); // Alternate function 5 is PWM
+
+      FanObj->PwmChanCfg.pwm_register.pwm_bitfield.mode = PWM_CTL_MODE_PWM;
+      FanObj->PwmChanCfg.pwm_register.pwm_bitfield.rptl = PWM_RPTL_STOP;
+      FanObj->PwmChanCfg.pwm_register.pwm_bitfield.sbit = PWM_SBIT_LOW;
+      FanObj->PwmChanCfg.pwm_register.pwm_bitfield.pola = PWM_POLA_DEFAULT;
+      FanObj->PwmChanCfg.pwm_register.pwm_bitfield.usef = PWM_USEF_DATA;
+      FanObj->PwmChanCfg.pwm_register.pwm_bitfield.msen = PWM_MSEN_MSRATIO;
+      FanObj->PwmChanCfg.divisor =   19;
+      FanObj->PwmChanCfg.range   = 1023;
+
+      pwm_configure(Channel, &FanObj->PwmChanCfg);
+      pwm_enable(Channel);
+
+      CFE_EVS_SendEvent (FAN_CONSTRUCTOR_EID, CFE_EVS_EventType_INFORMATION, 
+                         "Fan %d configured on PWM Channel %d BCM Pin %d", 
+                         FanId, Channel, FanObj->PwmBcmId);
+
+} /* End ConfigPwm() */
