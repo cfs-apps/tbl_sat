@@ -19,10 +19,6 @@
 **    1. The static "TblData" serves as a table load buffer. Table dump data is
 **       read directly from table owner's table storage.
 **
-**  References:
-**    1. OpenSatKit Object-based Application Developer's Guide.
-**    2. cFS Application Developer's Guide.
-**
 */
 
 /*
@@ -62,8 +58,11 @@ static CJSON_Obj_t JsonTblObjs[] = {
 
    /* Table Data Address        Table Data Length                 Updated,  Data Type,  Float,  core-json query string,  length of query string(exclude '\0') */
    
+   { &TblData.SurveyFanPwm,     sizeof(TblData.SurveyFanPwm),     false,    JSONNumber, false,  { "survey-fan-pwm",      (sizeof("survey-fan-pwm")-1)}      },
+   { &TblData.PosGain,          sizeof(TblData.PosGain),          false,    JSONNumber, true,   { "pos-gain",            (sizeof("pos-gain")-1)}            },
+   { &TblData.RateGain,         sizeof(TblData.RateGain),         false,    JSONNumber, true,   { "rate-gain",           (sizeof("rate-gain")-1)}           },
    { &TblData.Test.Steps,       sizeof(TblData.Test.Steps),       false,    JSONNumber, false,  { "test-steps",          (sizeof("test-steps")-1)}          },
-   { &TblData.Test.TimeInStep,  sizeof(TblData.Test.TimeInStep),  false,    JSONNumber, false,  { "test-time-in-step",   (sizeof("test-time-in-step")-1)}   },
+   { &TblData.Test.TimeInStep,  sizeof(TblData.Test.TimeInStep),  false,    JSONNumber, false,  { "test-time-in-step",   (sizeof("test-time-in-step")-1)}   }
 
 };
 
@@ -75,14 +74,12 @@ static CJSON_Obj_t JsonTblObjs[] = {
 **    1. This must be called prior to any other functions
 **
 */
-void SAT_CTRL_TBL_Constructor(SAT_CTRL_TBL_Class_t *SatCtrlTblPtr, const char *AppName)
+void SAT_CTRL_TBL_Constructor(SAT_CTRL_TBL_Class_t *SatCtrlTblPtr)
 {
 
    SatCtrlTbl = SatCtrlTblPtr;
 
-   CFE_PSP_MemSet(SatCtrlTbl, 0, sizeof(SAT_CTRL_TBL_Class_t));
- 
-   SatCtrlTbl->AppName = AppName;
+   CFE_PSP_MemSet(SatCtrlTbl, 0, sizeof(SAT_CTRL_TBL_Class_t));   
    
    SatCtrlTbl->JsonObjCnt = (sizeof(JsonTblObjs)/sizeof(CJSON_Obj_t));
          
@@ -102,56 +99,26 @@ void SAT_CTRL_TBL_Constructor(SAT_CTRL_TBL_Class_t *SatCtrlTblPtr, const char *A
 **  5. Creates a new dump file, overwriting anything that may have existed
 **     previously
 */
-bool SAT_CTRL_TBL_DumpCmd(TBLMGR_Tbl_t *Tbl, uint8 DumpType, const char *Filename)
+bool SAT_CTRL_TBL_DumpCmd(osal_id_t FileHandle)
 {
 
-   bool       RetStatus = false;
-   int32      SysStatus;
-   osal_id_t  FileHandle;
-   os_err_name_t OsErrStr;
    char DumpRecord[256];
-   char SysTimeStr[128];
+   sprintf(DumpRecord,"   \"pos-gain\": %0.6f,\n", SatCtrlTbl->Data.PosGain);
+   OS_write(FileHandle, DumpRecord, strlen(DumpRecord));
 
-   
-   SysStatus = OS_OpenCreate(&FileHandle, Filename, OS_FILE_FLAG_CREATE, OS_READ_WRITE);
-   
-   if (SysStatus == OS_SUCCESS)
-   {
- 
-      sprintf(DumpRecord,"{\n   \"app-name\": \"%s\",\n   \"tbl-name\": \"Table Sat Control\",\n", SatCtrlTbl->AppName);
-      OS_write(FileHandle, DumpRecord, strlen(DumpRecord));
+   sprintf(DumpRecord,"   \"rate-gain\": %0.6f,\n", SatCtrlTbl->Data.RateGain);
+   OS_write(FileHandle, DumpRecord, strlen(DumpRecord));
 
-      CFE_TIME_Print(SysTimeStr, CFE_TIME_GetTime());
-      sprintf(DumpRecord,"   \"description\": \"Table dumped at %s\",\n",SysTimeStr);
-      OS_write(FileHandle, DumpRecord, strlen(DumpRecord));
+   sprintf(DumpRecord,"   \"steps\": %d,\n", SatCtrlTbl->Data.Test.Steps);
+   OS_write(FileHandle, DumpRecord, strlen(DumpRecord));
 
-      sprintf(DumpRecord,"   \"steps\": %d,\n", SatCtrlTbl->Data.Test.Steps);
-      OS_write(FileHandle, DumpRecord, strlen(DumpRecord));
+   sprintf(DumpRecord,"   \"time-in-step\": %d,\n", SatCtrlTbl->Data.Test.TimeInStep);
+   OS_write(FileHandle, DumpRecord, strlen(DumpRecord));
 
-      sprintf(DumpRecord,"   \"time-in-step\": %d,\n", SatCtrlTbl->Data.Test.TimeInStep);
-      OS_write(FileHandle, DumpRecord, strlen(DumpRecord));
-       
-      sprintf(DumpRecord,"   }\n}\n");
-      OS_write(FileHandle, DumpRecord, strlen(DumpRecord));
+   sprintf(DumpRecord,"   }\n");
+  OS_write(FileHandle, DumpRecord, strlen(DumpRecord));
 
-      OS_close(FileHandle);
-
-      CFE_EVS_SendEvent(SAT_CTRL_TBL_DUMP_EID, CFE_EVS_EventType_DEBUG,
-                        "Successfully created dump file %s", Filename);
-                        
-      RetStatus = true;
-
-   } /* End if file create */
-   else
-   {
-      OS_GetErrorName(SysStatus, &OsErrStr);
-      CFE_EVS_SendEvent(SAT_CTRL_TBL_DUMP_EID, CFE_EVS_EventType_ERROR,
-                        "Error creating dump file '%s', status=%s",
-                        Filename, OsErrStr);
-   
-   } /* End if file create error */
-
-   return RetStatus;
+   return true;
    
 } /* End of SAT_CTRL_TBL_DumpCmd() */
 
@@ -161,10 +128,8 @@ bool SAT_CTRL_TBL_DumpCmd(TBLMGR_Tbl_t *Tbl, uint8 DumpType, const char *Filenam
 **
 ** Notes:
 **  1. Function signature must match TBLMGR_LoadTblFuncPtr_t.
-**  2. This could migrate into table manager but I think I'll keep it here so
-**     user's can add table processing code if needed.
 */
-bool SAT_CTRL_TBL_LoadCmd(TBLMGR_Tbl_t *Tbl, uint8 LoadType, const char *Filename)
+bool SAT_CTRL_TBL_LoadCmd(APP_C_FW_TblLoadOptions_Enum_t LoadType, const char *Filename)
 {
 
    bool  RetStatus = false;
@@ -172,12 +137,7 @@ bool SAT_CTRL_TBL_LoadCmd(TBLMGR_Tbl_t *Tbl, uint8 LoadType, const char *Filenam
    if (CJSON_ProcessFile(Filename, SatCtrlTbl->JsonBuf, SAT_CTRL_TBL_JSON_FILE_MAX_CHAR, LoadJsonData))
    {
       SatCtrlTbl->Loaded = true;
-      SatCtrlTbl->LastLoadStatus = TBLMGR_STATUS_VALID;
-      RetStatus = true;   
-   }
-   else
-   {
-      SatCtrlTbl->LastLoadStatus = TBLMGR_STATUS_INVALID;
+      RetStatus = true;
    }
 
    return RetStatus;
@@ -192,7 +152,6 @@ bool SAT_CTRL_TBL_LoadCmd(TBLMGR_Tbl_t *Tbl, uint8 LoadType, const char *Filenam
 void SAT_CTRL_TBL_ResetStatus(void)
 {
 
-   SatCtrlTbl->LastLoadStatus = TBLMGR_STATUS_UNDEF;
    SatCtrlTbl->LastLoadCnt = 0;
  
 } /* End SAT_CTRL_TBL_ResetStatus() */
@@ -234,8 +193,8 @@ static bool LoadJsonData(size_t JsonFileLen)
    }
    else
    {
-   
-      memcpy(&SatCtrlTbl->Data,&TblData, sizeof(SAT_CTRL_TBL_Data_t));
+      
+      memcpy(&SatCtrlTbl->Data, &TblData, sizeof(SAT_CTRL_TBL_Data_t));
       SatCtrlTbl->LastLoadCnt = ObjLoadCnt;
       CFE_EVS_SendEvent(SAT_CTRL_TBL_LOAD_EID, CFE_EVS_EventType_DEBUG, 
                         "Successfully loaded %d JSON objects",

@@ -18,10 +18,6 @@
 **  Notes:
 **    None
 **
-**  References:
-**    1. OpenSatKit Object-based Application Developer's Guide.
-**    2. cFS Application Developer's Guide.
-**
 */
 
 /*
@@ -29,10 +25,11 @@
 */
 
 #include <string.h>
-
+#include "gpio.h"
+#include "pwm.h"
 #include "app_cfg.h"
 #include "fan.h"
-#include "gpio.h"
+
 
 
 
@@ -56,7 +53,7 @@ static void ConfigPwm(FAN_Struct_t *FanObj, TBL_SAT_FanId_Enum_t FanId, int Chan
 **
 ** Notes:
 **   1. This must be called prior to any other function.
-**   2. TODO - Decide whether centralized Pi interface
+**   2. Can assume gpio_map() has been called and verified
 **
 */
 void FAN_Constructor(FAN_Class_t *FanPtr, INITBL_Class_t *IniTbl)
@@ -66,28 +63,61 @@ void FAN_Constructor(FAN_Class_t *FanPtr, INITBL_Class_t *IniTbl)
    
    memset(Fan, 0, sizeof(FAN_Class_t));
 
-   Fan->One.PwmBcmId  = INITBL_GetIntConfig(IniTbl, CFG_FAN_1_PWM_BCM_ID);
-   Fan->One.TachBcmId = INITBL_GetIntConfig(IniTbl, CFG_FAN_1_TACH_BCM_ID);
-   Fan->Two.PwmBcmId  = INITBL_GetIntConfig(IniTbl, CFG_FAN_2_PWM_BCM_ID);
-   Fan->Two.TachBcmId = INITBL_GetIntConfig(IniTbl, CFG_FAN_2_TACH_BCM_ID);
+   Fan->A.PwmBcmId  = INITBL_GetIntConfig(IniTbl, CFG_FAN_A_PWM_BCM_ID);
+   Fan->A.TachBcmId = INITBL_GetIntConfig(IniTbl, CFG_FAN_A_TACH_BCM_ID);
+   Fan->B.PwmBcmId  = INITBL_GetIntConfig(IniTbl, CFG_FAN_B_PWM_BCM_ID);
+   Fan->B.TachBcmId = INITBL_GetIntConfig(IniTbl, CFG_FAN_B_TACH_BCM_ID);
 
-   if (gpio_map() < 0 || pwm_map() < 0) // map peripherals
+   if (pwm_map() >= 0)
    {
-   
-      Fan->IoMapped = false;
-      CFE_EVS_SendEvent (FAN_CONSTRUCTOR_EID, CFE_EVS_EventType_ERROR, 
-                         "GPIO or PWM mapping failed. Verify chip selection in pi_iolib config.h");
+      Fan->PwmMapped = true;
+      ConfigPwm(&Fan->A, TBL_SAT_FanId_A, PWM_CHANNEL0);
+      ConfigPwm(&Fan->B, TBL_SAT_FanId_B, PWM_CHANNEL1);
 
    }
    else
    {
-      Fan->IoMapped = true;
-      ConfigPwm(&Fan->One, TBL_SAT_FanId_1, PWM_CHANNEL0);
-      ConfigPwm(&Fan->Two, TBL_SAT_FanId_2, PWM_CHANNEL1);
+      Fan->PwmMapped = false;
+      CFE_EVS_SendEvent (FAN_CONSTRUCTOR_EID, CFE_EVS_EventType_ERROR, 
+                         "PWM mapping failed. Verify chip selection in pi_iolib config.h and PWM pin assignments in JSON ini file");
 
-   } /* End if IO mapped */
+   } /* End if PWM mapped */
     
 } /* End FAN_Constructor() */
+
+
+/******************************************************************************
+** Function: FAN_OverridePwmCmd
+**
+** Override commanded PWM value.
+**
+** Notes:
+**   1. The overridded value is not limited.
+**
+*/
+bool FAN_OverridePwmCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr)
+{
+
+   const TBL_SAT_OverrideFanPwm_CmdPayload_t *OverrideCmd = CMDMGR_PAYLOAD_PTR(MsgPtr, TBL_SAT_OverrideFanPwm_t);
+
+   if (OverrideCmd->Duration == 0)
+   {
+      Fan->OverridePwmCmdEnabled = false;
+   }
+   else
+   {
+      Fan->OverridePwmCmdEnabled = true;
+      Fan->OverridePwmCmdCount   = OverrideCmd->Duration;
+      Fan->A.OverridePwmCmd = OverrideCmd->FanAPwm;
+      Fan->B.OverridePwmCmd = OverrideCmd->FanBPwm;
+      CFE_EVS_SendEvent (FAN_OVERRIDE_PWM_CMD_EID, CFE_EVS_EventType_INFORMATION,
+                         "Starting fan PWM command override for %d cycles. Fan A PWM: %d, Fan B PWM: %d",
+                         Fan->OverridePwmCmdCount, Fan->A.OverridePwmCmd, Fan->B.OverridePwmCmd);
+   }
+
+   return true;
+
+} /* End FAN_OverridePwmCmd() */
 
 
 /******************************************************************************
@@ -128,32 +158,57 @@ bool FAN_SetPwm(TBL_SAT_FanId_Enum_t FanId, uint16 Pwm)
       Limited = true;
    }
    
-   if (FanId == TBL_SAT_FanId_1)
+   if (FanId == TBL_SAT_FanId_A)
    {
-      Fan->One.PwmCmd = LimitedPwm;
-      if (Fan->IoMapped)
+      Fan->A.PwmCmd = LimitedPwm;
+      if (Fan->PwmMapped)
       {         
-         DAT_CHANNEL0 = Fan->One.PwmCmd;
+         if (Fan->OverridePwmCmdEnabled)
+         {
+            DAT_CHANNEL0 = Fan->A.OverridePwmCmd;
+         }
+         else
+         {
+            DAT_CHANNEL0 = Fan->A.PwmCmd;
+         }
       }
    }
    else
    {
-      Fan->Two.PwmCmd = LimitedPwm;
-      if (Fan->IoMapped)
+      Fan->B.PwmCmd = LimitedPwm;
+      if (Fan->PwmMapped)
       {         
-         DAT_CHANNEL1 = Fan->Two.PwmCmd;
+         if (Fan->OverridePwmCmdEnabled)
+         {
+            DAT_CHANNEL1 = Fan->B.OverridePwmCmd;
+         }
+         else
+         {
+            DAT_CHANNEL1 = Fan->B.PwmCmd;
+         }
       }
-   }   
+   }
+   if (Fan->OverridePwmCmdEnabled)
+   {
+      Fan->OverridePwmCmdCount--;
+      if (Fan->OverridePwmCmdCount == 0)
+      {
+         Fan->OverridePwmCmdEnabled = false;
+         CFE_EVS_SendEvent (FAN_SET_PWM_EID, CFE_EVS_EventType_INFORMATION,
+                            "Override fan PWM command terminated");           
+      }
+   }
    
    return Limited;
    
 } /* End FAN_SetPwm() */
 
+
 /******************************************************************************
 ** Function: ConfigPwm
 **
 ** Notes:
-**   1. TODO - Document magic numbers
+**   1. TODO - Document this mess and make a function
 **
 */
 static void ConfigPwm(FAN_Struct_t *FanObj, TBL_SAT_FanId_Enum_t FanId, int Channel)

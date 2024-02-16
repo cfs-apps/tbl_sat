@@ -20,10 +20,6 @@
 **       is passed to the constructor and saved for all other operations.
 **       This is a table-specific file so it doesn't need to be re-entrant.
 **
-**  References:
-**    1. OpenSatKit Object-based Application Developer's Guide
-**    2. cFS Application Developer's Guide
-**
 */
 
 #ifndef _sat_ctrl_tbl_
@@ -68,7 +64,10 @@ typedef struct
 
 typedef struct
 {
-
+   
+   uint16 SurveyFanPwm;
+   float  PosGain;
+   float  RateGain;
    SAT_CTRL_TBL_Test_t Test;
    
 } SAT_CTRL_TBL_Data_t;
@@ -85,20 +84,18 @@ typedef struct
    ** Table Data
    */
    
-   SAT_CTRL_TBL_Data_t     Data;
+   SAT_CTRL_TBL_Data_t Data;
    
    /*
    ** Standard CJSON table data
    */
    
-   const char*  AppName;
-   bool         Loaded;   /* Has entire table been loaded? */
-   uint8        LastLoadStatus;
-   uint16       LastLoadCnt;
+   bool    Loaded;       /* Has entire table been loaded? */
+   uint16  LastLoadCnt;
    
-   size_t       JsonObjCnt;
-   char         JsonBuf[SAT_CTRL_TBL_JSON_FILE_MAX_CHAR];   
-   size_t       JsonFileLen;
+   size_t  JsonObjCnt;
+   char    JsonBuf[SAT_CTRL_TBL_JSON_FILE_MAX_CHAR];   
+   size_t  JsonFileLen;
    
 } SAT_CTRL_TBL_Class_t;
 
@@ -118,7 +115,7 @@ typedef struct
 **      registered with the table manager.
 **
 */
-void SAT_CTRL_TBL_Constructor(SAT_CTRL_TBL_Class_t *TblObj, const char *AppName);
+void SAT_CTRL_TBL_Constructor(SAT_CTRL_TBL_Class_t *SatCtrlTblPtr);
 
 
 /******************************************************************************
@@ -128,11 +125,9 @@ void SAT_CTRL_TBL_Constructor(SAT_CTRL_TBL_Class_t *TblObj, const char *AppName)
 **
 ** Notes:
 **  1. Function signature must match TBLMGR_DumpTblFuncPtr_t.
-**  2. Can assume valid table file name because this is a callback from 
-**     the app framework table manager.
 **
 */
-bool SAT_CTRL_TBL_DumpCmd(TBLMGR_Tbl_t *Tbl, uint8 DumpType, const char *Filename);
+bool SAT_CTRL_TBL_DumpCmd(osal_id_t FileHandle);
 
 
 /******************************************************************************
@@ -146,7 +141,7 @@ bool SAT_CTRL_TBL_DumpCmd(TBLMGR_Tbl_t *Tbl, uint8 DumpType, const char *Filenam
 **     the app framework table manager.
 **
 */
-bool SAT_CTRL_TBL_LoadCmd(TBLMGR_Tbl_t *Tbl, uint8 LoadType, const char *Filename);
+bool SAT_CTRL_TBL_LoadCmd(APP_C_FW_TblLoadOptions_Enum_t LoadType, const char *Filename);
 
 
 /******************************************************************************

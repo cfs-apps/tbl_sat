@@ -20,10 +20,7 @@
 **       sensors and actuators.  For example if a different fan is used
 **       and as long as the term 'fan' can be used for the functional 
 **       interface name then the only files that may have to change are
-**       app_cfg.h, cpu1_tbl_sat_ini.json, and the fan.h, fan.c 
-**
-**  References:
-**    1. See app_cfg.harder prologue
+**       app_cfg.h, cpu1_tbl_sat_ini.json, and the fan.h, fan.c
 **
 */
 

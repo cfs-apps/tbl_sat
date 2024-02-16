@@ -18,10 +18,6 @@
 **  Notes:
 **    1. See tbl_sat_app.h for details.
 **
-**  References:
-**    1. OpenSatKit Object-based Application Developer's Guide
-**    2. cFS Application Developer's Guide
-**
 */
 
 /*
@@ -156,7 +152,7 @@ bool TBL_SAT_ResetAppCmd(void* ObjDataPtr, const CFE_MSG_Message_t *MsgPtr)
 static int32 InitApp(void)
 {
 
-   int32 Status = OSK_C_FW_CFS_ERROR;
+   int32 Status = APP_C_FW_CFS_ERROR;
    
    CHILDMGR_TaskInit_t ChildTaskInit;
    
@@ -173,15 +169,7 @@ static int32 InitApp(void)
       
       CFE_ES_PerfLogEntry(TblSat.PerfId);
 
-      /* Constructor sends error events */    
-      ChildTaskInit.TaskName  = INITBL_GetStrConfig(INITBL_OBJ, CFG_CHILD_NAME);
-      ChildTaskInit.PerfId    = INITBL_GetIntConfig(INITBL_OBJ, CFG_CHILD_PERF_ID);
-      ChildTaskInit.StackSize = INITBL_GetIntConfig(INITBL_OBJ, CFG_CHILD_STACK_SIZE);
-      ChildTaskInit.Priority  = INITBL_GetIntConfig(INITBL_OBJ, CFG_CHILD_PRIORITY);
-      Status = CHILDMGR_Constructor(CHILDMGR_OBJ, 
-                                    ChildMgr_TaskMainCallback,
-                                    SAT_CTRL_ChildTask, 
-                                    &ChildTaskInit); 
+      Status = CFE_SUCCESS;
   
    } /* End if INITBL Constructed */
   
@@ -189,7 +177,7 @@ static int32 InitApp(void)
    {
 
       /* Must constructor table manager prior to any app objects that contain tables */
-      TBLMGR_Constructor(TBLMGR_OBJ);
+      TBLMGR_Constructor(TBLMGR_OBJ, INITBL_GetStrConfig(INITBL_OBJ, CFG_APP_CFE_NAME));
 
       SAT_CTRL_Constructor(SAT_CTRL_OBJ, INITBL_OBJ, TBLMGR_OBJ);
 
@@ -202,13 +190,27 @@ static int32 InitApp(void)
       CFE_SB_Subscribe(TblSat.SendStatusMid, TblSat.CmdPipe);
 
       CMDMGR_Constructor(CMDMGR_OBJ);
-      CMDMGR_RegisterFunc(CMDMGR_OBJ, CMDMGR_NOOP_CMD_FC,   NULL, TBL_SAT_NoOpCmd,     0);
-      CMDMGR_RegisterFunc(CMDMGR_OBJ, CMDMGR_RESET_CMD_FC,  NULL, TBL_SAT_ResetAppCmd, 0);
+      CMDMGR_RegisterFunc(CMDMGR_OBJ, CMDMGR_NOOP_CMD_FC,  NULL, TBL_SAT_NoOpCmd,     0);
+      CMDMGR_RegisterFunc(CMDMGR_OBJ, CMDMGR_RESET_CMD_FC, NULL, TBL_SAT_ResetAppCmd, 0);
+      CMDMGR_RegisterFunc(CMDMGR_OBJ, TBL_SAT_LOAD_TBL_CC, TBLMGR_OBJ, TBLMGR_LoadTblCmd, sizeof(TBL_SAT_LoadTbl_CmdPayload_t));
+      CMDMGR_RegisterFunc(CMDMGR_OBJ, TBL_SAT_DUMP_TBL_CC, TBLMGR_OBJ, TBLMGR_DumpTblCmd, sizeof(TBL_SAT_DumpTbl_CmdPayload_t));
 
-OS_printf("sizeof(TBL_SAT_SetCtrlMode_Payload_t)=%d\n", (uint32)sizeof(TBL_SAT_SetCtrlMode_Payload_t));
-      CMDMGR_RegisterFunc(CMDMGR_OBJ, TBL_SAT_SET_CTRL_MODE_CC,  SAT_CTRL_OBJ, SAT_CTRL_SetModeCmd,  2); //sizeof(TBL_SAT_SetCtrlMode_Payload_t));
+OS_printf("*****sizeof(TBL_SAT_SetCtrlMode_Payload_t)=%d\n", (uint32)sizeof(TBL_SAT_SetCtrlMode_Payload_t));
+      CMDMGR_RegisterFunc(CMDMGR_OBJ, TBL_SAT_SET_CTRL_MODE_CC,    SAT_CTRL_OBJ, SAT_CTRL_SetModeCmd,      2); //sizeof(TBL_SAT_SetCtrlMode_Payload_t));
+      CMDMGR_RegisterFunc(CMDMGR_OBJ, TBL_SAT_SET_CTRL_GAINS_CC,   SAT_CTRL_OBJ, SAT_CTRL_SetCtrlGainsCmd, sizeof(TBL_SAT_SetCtrlGains_Payload_t)); //sizeof(TBL_SAT_SetCtrlMode_Payload_t));
+      CMDMGR_RegisterFunc(CMDMGR_OBJ, TBL_SAT_OVERRIDE_FAN_PWM_CC, SAT_CTRL_OBJ, FAN_OverridePwmCmd,       sizeof(TBL_SAT_OverrideFanPwm_Payload_t)); //sizeof(TBL_SAT_SetCtrlMode_Payload_t));
       
       CFE_MSG_Init(CFE_MSG_PTR(TblSat.StatusTlm.TelemetryHeader), CFE_SB_ValueToMsgId(INITBL_GetIntConfig(INITBL_OBJ, CFG_TBL_SAT_STATUS_TLM_TOPICID)), sizeof(TBL_SAT_StatusTlm_t));
+
+      /* Constructor sends error events */    
+      ChildTaskInit.TaskName  = INITBL_GetStrConfig(INITBL_OBJ, CFG_CHILD_NAME);
+      ChildTaskInit.PerfId    = INITBL_GetIntConfig(INITBL_OBJ, CFG_CHILD_PERF_ID);
+      ChildTaskInit.StackSize = INITBL_GetIntConfig(INITBL_OBJ, CFG_CHILD_STACK_SIZE);
+      ChildTaskInit.Priority  = INITBL_GetIntConfig(INITBL_OBJ, CFG_CHILD_PRIORITY);
+      Status = CHILDMGR_Constructor(CHILDMGR_OBJ, 
+                                    ChildMgr_TaskMainCallback,
+                                    SAT_CTRL_ChildTask, 
+                                    &ChildTaskInit); 
    
       /*
       ** Application startup event message
@@ -304,20 +306,38 @@ static void SendStatusTlm(void)
    StatusTlmPayload->InvalidCmdCnt = TblSat.CmdMgr.InvalidCmdCnt;
 
    /*
+   ** Hardware Interface and Sensor Data
+   */ 
+   
+   StatusTlmPayload->FanIoMapped      = TblSat.SatCtrl.Fan.PwmMapped;
+   StatusTlmPayload->VisibleLight     = TblSat.SatCtrl.Mqtt.SensorTlm.Payload.LuxA;
+   StatusTlmPayload->UltravioletLight = TblSat.SatCtrl.Mqtt.SensorTlm.Payload.LuxB;
+   StatusTlmPayload->RawRateX         = TblSat.SatCtrl.Mqtt.SensorTlm.Payload.RateX;
+   StatusTlmPayload->RawRateY         = TblSat.SatCtrl.Mqtt.SensorTlm.Payload.RateY;
+   StatusTlmPayload->RawRateZ         = TblSat.SatCtrl.Mqtt.SensorTlm.Payload.RateZ;
+   StatusTlmPayload->DeltaTime        = TblSat.SatCtrl.Mqtt.SensorTlm.Payload.DeltaTime;
+   
+   
+   /*
    ** Controller 
    */ 
    
-   StatusTlmPayload->CtrlMode        = TblSat.SatCtrl.Mode;
-   StatusTlmPayload->CtrlTimeInMode  = TblSat.SatCtrl.TimeInMode;
+   StatusTlmPayload->CtrlMode           = TblSat.SatCtrl.Mode;
+   StatusTlmPayload->TimeInCtrlMode     = TblSat.SatCtrl.TimeInMode;
+   StatusTlmPayload->TotalLight         = TblSat.SatCtrl.Sensor.TotalLight;
+   StatusTlmPayload->SpinRate           = TblSat.SatCtrl.Sensor.SpinRate;
+   StatusTlmPayload->SunAcqState        = TblSat.SatCtrl.SunAcqMode.State;
+   StatusTlmPayload->PosErr             = TblSat.SatCtrl.SunAcqMode.PosErr;
+   StatusTlmPayload->RateErr            = TblSat.SatCtrl.SunAcqMode.RateErr;
+   StatusTlmPayload->PosGain            = TblSat.SatCtrl.Tbl.Data.PosGain;
+   StatusTlmPayload->RateGain           = TblSat.SatCtrl.Tbl.Data.RateGain;
+   StatusTlmPayload->FanAPwmCmd         = TblSat.SatCtrl.Fan.A.PwmCmd;
+   StatusTlmPayload->FanBPwmCmd         = TblSat.SatCtrl.Fan.B.PwmCmd;
+   StatusTlmPayload->FanOverrideEnabled = TblSat.SatCtrl.Fan.OverridePwmCmdEnabled;
+   StatusTlmPayload->FanOverrideCnt     = TblSat.SatCtrl.Fan.OverridePwmCmdCount;
+   StatusTlmPayload->FanAOverridePwmCmd = TblSat.SatCtrl.Fan.A.OverridePwmCmd;
+   StatusTlmPayload->FanBOverridePwmCmd = TblSat.SatCtrl.Fan.B.OverridePwmCmd;
 
-   StatusTlmPayload->FanIoMapped     = TblSat.SatCtrl.Fan.IoMapped;
-
-   StatusTlmPayload->Fan1PwmCmd      = TblSat.SatCtrl.Fan.One.PwmCmd;
-   StatusTlmPayload->Fan1PulsePerSec = TblSat.SatCtrl.Fan.One.PulsePerSec;
-
-   StatusTlmPayload->Fan2PwmCmd      = TblSat.SatCtrl.Fan.Two.PwmCmd;
-   StatusTlmPayload->Fan2PulsePerSec = TblSat.SatCtrl.Fan.Two.PulsePerSec;
-   
    CFE_SB_TimeStampMsg(CFE_MSG_PTR(TblSat.StatusTlm.TelemetryHeader));
    CFE_SB_TransmitMsg(CFE_MSG_PTR(TblSat.StatusTlm.TelemetryHeader), true);
    

@@ -1,8 +1,12 @@
 {
-   "title": "Raspberry Pi Table Sat Control Paramaters",
-   "description": [ "",
-                    "See app_cfg.h for details"],
+   "title": "Raspberry Pi Table Sat Control Parameters",
+   "description": [ "Define controller parameters",
+                    "See sat_ctrl_tbl.* for details"  ],
    "test-steps": 5,
-   "test-time-in-step": 10
+   "test-time-in-step": 10,
+
+   "survey-fan-pwm": 50,
+   "pos-gain": 0.5,
+   "rate-gain": 0.01
 
 }

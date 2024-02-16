@@ -21,14 +21,14 @@
 **       object for each fan which means one set of functions and
 **       separate data structures declared for each fan. This would
 **       require a pointer to be passed as the first parameter in each
-**       method. Since teh fans are simple this seemed like oaverkill. 
+**       method. Since the fans are simple this seemed like overkill. 
 **       Also the filename was kept singular.
 **    2. Noctua NF-A4x10 5V PWM, https://noctua.at/en/nf-a4x10-5v-pwm
-**    3. TODO - Consider adding a map command if it fails during init. 
-**
-**  References:
-**    1. OpenSatKit Object-based Application Developer's Guide.
-**    2. cFS Application Developer's Guide.
+**    3. The original design included reading the fan tachometer. This
+**       hardware wiring has been removed, but there are still some
+**       software variables that have not been removed in case it is
+**       added back in. One challenge is configuring interrupts.
+**    TODO - Consider adding a map command if it fails during init.
 **
 */
 
@@ -47,14 +47,16 @@
 /***********************/
 
 #define FAN_MIN_PWM       0
-#define FAN_MAX_PWM    1023
+#define FAN_MAX_PWM    2047
 #define FAN_PWM_RANGE  (FAN_MAX_PWM - FAN_MIN_PWM)
 
 /*
 ** Event Message IDs
 */
 
-#define FAN_CONSTRUCTOR_EID  (FAN_BASE_EID + 0)
+#define FAN_CONSTRUCTOR_EID       (FAN_BASE_EID + 0)
+#define FAN_OVERRIDE_PWM_CMD_EID  (FAN_BASE_EID + 1)
+#define FAN_SET_PWM_EID           (FAN_BASE_EID + 2)
 
 
 /**********************/
@@ -70,6 +72,7 @@ typedef struct
    
    uint16 PwmCmd;
    uint16 PulsePerSec;
+   uint16 OverridePwmCmd;
    
    pwm_channel_config PwmChanCfg;
    
@@ -85,11 +88,15 @@ typedef struct
    /*
    ** Class State Data
    */
-
-   FAN_Struct_t  One;
-   FAN_Struct_t  Two;
    
-   bool IoMapped;
+   bool    PwmMapped;   
+   bool    OverridePwmCmdEnabled;
+   uint32  OverridePwmCmdCount;
+
+   FAN_Struct_t  A;
+   FAN_Struct_t  B;
+   
+
    
 } FAN_Class_t;
 
@@ -113,6 +120,15 @@ void FAN_Constructor(FAN_Class_t *FanPtr, INITBL_Class_t *IniTbl);
 
 
 /******************************************************************************
+** Function: FAN_OverridePwmCmd
+**
+** Override the computed PWM with a value that is not limited. A duration of
+** zero will stop an override.
+*/
+bool FAN_OverridePwmCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr);
+
+
+/******************************************************************************
 ** Function: FAN_ResetStatus
 **
 ** Reset counters and status flags to a known reset state.
@@ -126,7 +142,7 @@ void FAN_ResetStatus(void);
 
 
 /******************************************************************************
-** Function: FAN_SetOffTimeCmd
+** Function: FAN_SetPwm
 **
 ** Return value indicates whether the PWM value was limited.
 */

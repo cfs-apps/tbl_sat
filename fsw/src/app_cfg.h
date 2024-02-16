@@ -19,13 +19,7 @@
 **    1. These macros can only be built with the application and can't
 **       have a platform scope because the same app_cfg.h filename is used for
 **       all applications following the object-based application design.
-**
-**  References:
-**    1. OpenSatKit Object-based Application Developer's Guide and osk_demo's
-**       app_cfg.h for what items should be defined in thsi file and how to
-**       define them
-**    2. Table Sat tutorial
-**    3. This reference doesn't directly apply to this file but discusses
+**    2. This reference doesn't directly apply to this file but discusses
 **       Raspian interrupts/events which applies to several of the objects
 **       in this app_cfg
 **       https://www.i-programmer.info/programming/hardware/14114-raspberry-pi-iot-in-c-events-a-interrupts.html
@@ -42,7 +36,7 @@
 #include "tbl_sat_eds_typedefs.h"
 
 #include "tbl_sat_platform_cfg.h"
-#include "osk_c_fw.h"
+#include "app_c_fw.h"
 
 
 /******************************************************************************
@@ -68,10 +62,10 @@
 **   
 **    3       2   I2C Data
 **    5       3   I2C Clock
-**   12      18   FAN 1 Pulse Width Modulation Control
-**   18      24   FAN 1 Tachometer (pulses per revolution) 
-**   35      19   FAN 2 Pulse Width Modulation control
-**   37      26   FAN 2 Tachometer (pulses per revolution) 
+**   12      18   FAN A Pulse Width Modulation Control
+**   18      24   FAN A Tachometer (pulses per revolution) 
+**   35      19   FAN B Pulse Width Modulation control
+**   37      26   FAN B Tachometer (pulses per revolution) 
 **
 */
 
@@ -84,21 +78,24 @@
 #define CFG_TBL_SAT_CMD_TOPICID         TBL_SAT_CMD_TOPICID
 #define CFG_BC_SCH_1_HZ_TOPICID         BC_SCH_1_HZ_TOPICID
 #define CFG_TBL_SAT_STATUS_TLM_TOPICID  TBL_SAT_STATUS_TLM_TOPICID
+#define CFG_MQTT_GW_TOPIC_4_TLM_TOPICID MQTT_GW_TOPIC_4_TLM_TOPICID
 
 #define CFG_CHILD_NAME       CHILD_NAME
 #define CFG_CHILD_PERF_ID    CHILD_PERF_ID
 #define CFG_CHILD_STACK_SIZE CHILD_STACK_SIZE
 #define CFG_CHILD_PRIORITY   CHILD_PRIORITY
 
-#define CFG_SAT_CTRL_PERIOD  SAT_CTRL_PERIOD
-#define CFG_SAT_CTRL_TBL_DEF SAT_CTRL_TBL_DEF
+#define CFG_SAT_CTRL_MQTT_PIPE_NAME   SAT_CTRL_MQTT_PIPE_NAME
+#define CFG_SAT_CTRL_MQTT_PIPE_DEPTH  SAT_CTRL_MQTT_PIPE_DEPTH
+#define CFG_SAT_CTRL_PERIOD           SAT_CTRL_PERIOD
+#define CFG_SAT_CTRL_TBL_DEF          SAT_CTRL_TBL_DEF
 
 #define CFG_I2C_SDA_BCM_ID    I2C_SDA_BCM_ID
 #define CFG_I2C_SCL_BCM_ID    I2C_SCL_BCM_ID
-#define CFG_FAN_1_PWM_BCM_ID  FAN_1_PWM_BCM_ID
-#define CFG_FAN_1_TACH_BCM_ID FAN_1_TACH_BCM_ID
-#define CFG_FAN_2_PWM_BCM_ID  FAN_2_PWM_BCM_ID
-#define CFG_FAN_2_TACH_BCM_ID FAN_2_TACH_BCM_ID
+#define CFG_FAN_A_PWM_BCM_ID  FAN_A_PWM_BCM_ID
+#define CFG_FAN_A_TACH_BCM_ID FAN_A_TACH_BCM_ID
+#define CFG_FAN_B_PWM_BCM_ID  FAN_B_PWM_BCM_ID
+#define CFG_FAN_B_TACH_BCM_ID FAN_B_TACH_BCM_ID
       
 
 #define APP_CONFIG(XX) \
@@ -109,18 +106,21 @@
    XX(TBL_SAT_CMD_TOPICID,uint32) \
    XX(BC_SCH_1_HZ_TOPICID,uint32) \
    XX(TBL_SAT_STATUS_TLM_TOPICID,uint32) \
+   XX(MQTT_GW_TOPIC_4_TLM_TOPICID,uint32) \
    XX(CHILD_NAME,char*) \
    XX(CHILD_PERF_ID,uint32) \
    XX(CHILD_STACK_SIZE,uint32) \
    XX(CHILD_PRIORITY,uint32) \
+   XX(SAT_CTRL_MQTT_PIPE_NAME,char*) \
+   XX(SAT_CTRL_MQTT_PIPE_DEPTH,uint32) \
    XX(SAT_CTRL_PERIOD,uint32) \
    XX(SAT_CTRL_TBL_DEF,char*) \
    XX(I2C_SDA_BCM_ID,uint32) \
    XX(I2C_SCL_BCM_ID,uint32) \
-   XX(FAN_1_PWM_BCM_ID,uint32) \
-   XX(FAN_1_TACH_BCM_ID,uint32) \
-   XX(FAN_2_PWM_BCM_ID,uint32) \
-   XX(FAN_2_TACH_BCM_ID,uint32) \
+   XX(FAN_A_PWM_BCM_ID,uint32) \
+   XX(FAN_A_TACH_BCM_ID,uint32) \
+   XX(FAN_B_PWM_BCM_ID,uint32) \
+   XX(FAN_B_TACH_BCM_ID,uint32) \
 
 DECLARE_ENUM(Config,APP_CONFIG)
 
@@ -133,17 +133,16 @@ DECLARE_ENUM(Config,APP_CONFIG)
 ** exceeded so it is the developer's responsibility to verify the ranges. 
 */
 
-#define TBL_SAT_BASE_EID      (OSK_C_FW_APP_BASE_EID +  0)
-#define SAT_CTRL_BASE_EID     (OSK_C_FW_APP_BASE_EID + 10)
-#define SAT_CTRL_TBL_BASE_EID (OSK_C_FW_APP_BASE_EID + 20)
-#define IMU_BASE_EID          (OSK_C_FW_APP_BASE_EID + 30)
-#define LIDET_BASE_EID        (OSK_C_FW_APP_BASE_EID + 40)
-#define FAN_BASE_EID          (OSK_C_FW_APP_BASE_EID + 50)
+#define TBL_SAT_BASE_EID      (APP_C_FW_APP_BASE_EID +  0)
+#define SAT_CTRL_BASE_EID     (APP_C_FW_APP_BASE_EID + 10)
+#define SAT_CTRL_TBL_BASE_EID (APP_C_FW_APP_BASE_EID + 20)
+#define FAN_BASE_EID          (APP_C_FW_APP_BASE_EID + 30)
 
 /******************************************************************************
 ** SAT_CTRL Table Macros
 */
 
 #define SAT_CTRL_TBL_JSON_FILE_MAX_CHAR  4090 
+#define SAT_CTRL_TBL_NAME                "Control Parameters" 
 
 #endif /* _app_cfg_ */

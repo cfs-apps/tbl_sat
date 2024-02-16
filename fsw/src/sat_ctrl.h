@@ -13,18 +13,13 @@
 **  GNU Affero General Public License for more details.
 **
 **  Purpose:
-**    Define the Table Sat conroller class
+**    Define the Table Sat controller class
 **
 **  Notes:
 **    1. Conceptually GPIO could be a separate object but since 
 **       mapping is the only function performed by the GPIO object 
-**       it's part of this SAT_CTRL. Also since SAT_CTRL contains
-**       all of the GPIO objects connected to the GPIO it makes it 
-**       easy.  
-**
-**  References:
-**    1. OpenSatKit Object-based Application Developer's Guide.
-**    2. cFS Application Developer's Guide.
+**       it's part of SAT_CTRL. Also since SAT_CTRL contains all
+**       of the GPIO objects connected to the GPIO it makes it easy.
 **
 */
 
@@ -34,11 +29,10 @@
 /*
 ** Includes
 */
+#include "mqtt_gw_eds_typedefs.h"
 
 #include "app_cfg.h"
 #include "sat_ctrl_tbl.h"
-#include "imu.h"
-#include "lidet.h"
 #include "fan.h"
 
 
@@ -51,11 +45,13 @@
 ** Event Message IDs
 */
 
-#define SAT_CTRL_CONSTRUCTOR_EID  (SAT_CTRL_BASE_EID + 0)
-#define SAT_CTRL_SET_MODE_EID     (SAT_CTRL_BASE_EID + 1)
-#define SAT_CTRL_CHILD_TASK_EID   (SAT_CTRL_BASE_EID + 2)
-#define SAT_CTRL_TEST_MODE_EID    (SAT_CTRL_BASE_EID + 3)
-
+#define SAT_CTRL_CONSTRUCTOR_EID    (SAT_CTRL_BASE_EID + 0)
+#define SAT_CTRL_SET_MODE_EID       (SAT_CTRL_BASE_EID + 1)
+#define SAT_CTRL_SET_CTRL_GAINS_EID (SAT_CTRL_BASE_EID + 2)
+#define SAT_CTRL_CHILD_TASK_EID     (SAT_CTRL_BASE_EID + 3)
+#define SATCTRL_SUN_ACQ_EID         (SAT_CTRL_BASE_EID + 4)
+#define SAT_CTRL_TEST_MODE_EID      (SAT_CTRL_BASE_EID + 5)
+#define SATCTRL_GET_MQTT_MSG_EID    (SAT_CTRL_BASE_EID + 6)
 
 /**********************/
 /** Type Definitions **/
@@ -76,6 +72,31 @@
 ** SAT_CTRL_Class
 */
 
+typedef enum
+{
+   LIGHT_UNDEF      = 1,
+   LIGHT_INCREASING = 2,
+   LIGHT_DECREASING = 3
+   
+} SAT_CTRL_LightIntensity_t;
+
+
+typedef struct
+{
+   bool                       NewSensorTlm;
+   MQTT_GW_TblSatSensorTlm_t  SensorTlm;
+   
+} SAT_CTRL_Mqtt_t;
+
+
+typedef struct
+{
+   uint32  TotalLight;
+   double  SpinRate;
+   
+} SAT_CTRL_Sensor_t;
+
+
 typedef struct
 {
    uint16  CurPwm;
@@ -89,8 +110,16 @@ typedef struct
 typedef struct
 {
 
-   float TODO;
-    
+   TBL_SAT_SunAcqState_Enum_t  State;
+   double  PosErr;
+   double  RateErr;
+   uint16  FanAPwmCmd;
+   uint16  FanBPwmCmd;
+   uint32  SurveyMaxLight;
+   double  SurveyRotation;
+   double  AcquireTolerance;
+   SAT_CTRL_LightIntensity_t  LightIntensity;
+   
 } SAT_CTRL_SunAcqMode_t;
 
 typedef struct
@@ -100,16 +129,24 @@ typedef struct
    ** Framework References
    */
    
-   INITBL_Class_t*  IniTbl;
+   INITBL_Class_t *IniTbl;
 
 
    /*
    ** Class State Data
    */
 
+   bool    GpioMapped;
+   
    uint32  ExecPeriod;  // Execution period in milliseconds
    uint16  ExecPerSec;                   
    uint32  ExecCntr;
+
+   CFE_SB_PipeId_t   MqttPipe;
+   CFE_SB_MsgId_t    MqttSensorTlmMid;
+   SAT_CTRL_Mqtt_t   Mqtt;
+   SAT_CTRL_Sensor_t Sensor;
+   FAN_Class_t       Fan;
    
    TBL_SAT_CtrlMode_Enum_t  Mode;
    bool                     InitMode;
@@ -118,11 +155,7 @@ typedef struct
    
    SAT_CTRL_TestMode_t      TestMode;
    SAT_CTRL_SunAcqMode_t    SunAcqMode;
-   
-   LIDET_Class_t  LiDet;
-   IMU_Class_t    Imu;
-   FAN_Class_t    Fan;
-   
+         
 } SAT_CTRL_Class_t;
 
 
@@ -169,6 +202,13 @@ void SAT_CTRL_ResetStatus(void);
 **
 */
 bool SAT_CTRL_SetModeCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr);
+
+
+/******************************************************************************
+** Function: SAT_CTRL_SetCtrlGainsCmd
+**
+*/
+bool SAT_CTRL_SetCtrlGainsCmd(void *DataObjPtr, const CFE_MSG_Message_t *MsgPtr);
 
 
 #endif /* _sat_ctrl_ */

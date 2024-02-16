@@ -1,0 +1,218 @@
+#!/usr/bin/env python
+"""
+    Copyright 2022 bitValence, Inc.
+    All Rights Reserved.
+    This program is free software; you can modify and/or redistribute it
+    under the terms of the GNU Affero General Public License
+    as published by the Free Software Foundation; version 3 with
+    attribution addendums as found in the LICENSE.txt.
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+    
+    Purpose:
+      Read AdaFruit ISM330DHCX's IMU and LTR-329 LUX data and publish
+      it in an MQTT message
+        
+    Notes:    
+      1. This is specifically written for tablesat and not intended
+         for reuse so all constants, MQTT message payloads, etc. are 
+         defined in this file.
+       
+"""
+import os
+import sys
+import time
+import configparser
+import json
+import subprocess
+import queue
+
+import busio
+import board
+from adafruit_lsm6ds.ism330dhcx import ISM330DHCX
+from adafruit_ltr329_ltr303 import LTR329
+from adafruit_ltr390 import LTR390
+import paho.mqtt.client as mqtt
+
+
+###############################################################################
+
+# MQTT is local mosquitto 
+MQTT_BROKER_ADDR = "localhost" #127.0.0.1, 
+MQTT_BROKER_PORT = 1883
+MQTT_TOPIC       = "tablesat/sensors"
+MQTT_CLIENT_NAME = "tablesat"
+
+EMQX_BROKER_ADDR = "broker.emqx.io"
+EMQX_BROKER_PORT = 1883
+EMQX_TOPIC       = "basecamp/demo/coord"
+EMQX_CLIENT_NAME = "tablesat"
+
+SENSOR_LOOP_DELAY = 0.5
+
+# This is for a second I2C bus but I couldn't get
+# busio.I2C(I2C_B_SCL,I2C_B_SDA) to work
+I2C_B_SCL = 12
+I2C_B_SDA = 16
+
+############################################################################
+
+mqtt_client    = None
+mqtt_connected = False
+
+def mqtt_on_connect(client, userdata, flags, rc):
+    """
+    """
+    print(f'MQTT broker connected with result code {rc}')
+
+
+def mqtt_recv_msg(client, userdata, msg):
+    """
+    No input messages are expected so simply print message
+    """
+    msg_str = msg.payload.decode()
+    msg_str_single_quote = msg_str.replace('"',"'")
+    print(f'Received message : {msg.topic}=>{msg_str_single_quote}')
+
+
+def mqtt_connect():
+    try:
+        global mqtt_client, mqtt_connected 
+        mqtt_client = mqtt.Client(MQTT_CLIENT_NAME)
+        mqtt_client.on_connect = mqtt_on_connect     # Callback function for successful connection
+        mqtt_client.on_message = mqtt_recv_msg       # Callback function for receipt of a message
+        mqtt_client.connect(MQTT_BROKER_ADDR)
+        mqtt_client.loop_start()                     # Start networking daemon             
+        print(f'MQTT client initialized on {MQTT_BROKER_ADDR}:{MQTT_BROKER_PORT}\n')
+        mqtt_connected = True
+    except Exception as e:
+        print(f'MQTT client initialization error for {MQTT_BROKER_ADDR}:{MQTT_BROKER_PORT}')
+        print(f'Error: {e}')
+    return mqtt_connected 
+
+
+############################################################################
+
+emqx_client    = None
+emqx_connected = False
+
+def emqx_on_connect(client, userdata, flags, rc):
+    """
+    """
+    print(f'EMQX broker connected with result code {rc}')
+
+
+def emqx_recv_msg(client, userdata, msg):
+    """
+    No input messages are expected so simply print message
+    """
+    msg_str = msg.payload.decode()
+    msg_str_single_quote = msg_str.replace('"',"'")
+    print(f'EMQX received message : {msg.topic}=>{msg_str_single_quote}')
+
+
+def emqx_connect():
+    try:
+        global emqx_client, emqx_connected 
+        emqx_client = mqtt.Client(EMQX_CLIENT_NAME)
+        emqx_client.on_connect = emqx_on_connect     # Callback function for successful connection
+        emqx_client.on_message = emqx_recv_msg       # Callback function for receipt of a message
+        emqx_client.connect(EMQX_BROKER_ADDR)
+        emqx_client.loop_start()                     # Start networking daemon             
+        print(f'EMQX client initialized on {EMQX_BROKER_ADDR}:{EMQX_BROKER_PORT}')
+        emqx_connected = True
+    except Exception as e:
+        print(f'EMQX client initialization error for {EMQX_BROKER_ADDR}:{EMQX_BROKER_PORT}')
+        print(f'Error: {e}')
+    return emqx_connected 
+
+###############################################################################
+
+
+
+def read_sensor_data():
+    """
+    """
+    try:
+        init_cycle = True
+        delta_time = 0.0
+        prev_time  = 0.0
+        device = "I2C Board"
+        i2c    = board.I2C()  # uses default board.SCL(GPIO 3) and board.SDA(GPIO 2)
+        device = "ISM330DHCX"
+        lsm330 = ISM330DHCX(i2c)
+        device = "LTR329"
+        ltr329 = LTR329(i2c)
+        device = "LTR390"
+        ltr390 = LTR390(i2c) 
+        print("Sensors initialized")
+        while True:
+            try:
+                start_time = time.time()
+                if not init_cycle:
+                    delta_time = start_time - prev_time
+                    publish_sensor_data(delta_time,lsm330,ltr329,ltr390)
+                    delay_time = SENSOR_LOOP_DELAY - (time.time() - start_time)
+                    #print(f'Delay: {delay}')
+                    time.sleep(delay_time)
+                else:
+                    init_cycle = False
+                prev_time  = start_time
+            except KeyboardInterrupt:
+                sys.exit()
+    except Exception as e:
+        print(f'Error initializing I2C:{device}')
+        print(f'Error: {e}')
+                    
+        
+def publish_sensor_data(delta_time,lsm330,ltr329,ltr390):
+    """
+    LTR329:
+       visible_plus_ir_light - 
+       ir_light - Raw infrared
+    LTR390:
+       uvs   - Raw UV light measurement
+       light - Raw ambient light measurement
+       uvi   - Calculated UV index
+       lux   - Calculated Lux ambient light value
+    """
+    global mqtt_client, mqtt_connected 
+    global emqx_client, emqx_connected 
+    #print("Acceleration: X:%.2f, Y: %.2f, Z: %.2f m/s^2" % (self.sensor.acceleration))
+    #print("Gyro X:%.2f, Y: %.2f, Z: %.2f radians/s\n" % (self.sensor.gyro))
+    coord_payload = '{ "coord": {"x": %2f, "y": %2f, "z": %2f} }' % \
+                     (lsm330.gyro[0], lsm330.gyro[1], lsm330.gyro[2])         
+    payload = '{ "ir_light": {"a": %d, "b": %2d} }' % \
+              (ltr329.ir_light, ltr390.uvs)
+    payload = '{ "delta-time": %.9f,"rate": {"x": %0.6f, "y": %0.6f, "z": %0.6f}, "lux": { "a": %d, "b": %d}}' % \
+              ( delta_time, lsm330.gyro[0], lsm330.gyro[1], lsm330.gyro[2], ltr329.visible_plus_ir_light, ltr390.light)
+    if mqtt_connected:
+        #print(f'Publishing telemetry {MQTT_TOPIC}, {payload}')
+        mqtt_client.publish(MQTT_TOPIC, payload)
+    if emqx_connected:
+        print(f'Publishing telemetry {EMQX_TOPIC}, {coord_payload}')
+        emqx_client.publish(EMQX_TOPIC, coord_payload)
+        
+
+############################################################################
+
+if __name__ == "__main__":
+    #print(board.SCL,board.SDA)
+    try:
+        try:
+           emqx_connect()
+        except:
+           pass
+        if mqtt_connect(): 
+            read_sensor_data()
+    except:
+        if mqtt_connected:
+            print('Closing mosquitto client')
+            mqtt_client.loop_stop()
+            mqtt_client.disconnect()
+        if emqx_connected: 
+            print('Closing emqx client')
+            emqx_client.loop_stop()
+            emqx_client.disconnect()
