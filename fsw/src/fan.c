@@ -79,7 +79,7 @@ void FAN_Constructor(FAN_Class_t *FanPtr, INITBL_Class_t *IniTbl)
    {
       Fan->PwmMapped = false;
       CFE_EVS_SendEvent (FAN_CONSTRUCTOR_EID, CFE_EVS_EventType_ERROR, 
-                         "PWM mapping failed. Verify chip selection in pi_iolib config.h and PWM pin assignments in JSON ini file");
+                         "PWM mapping failed. Verify chip selection in rpi_iolib config.h and PWM pin assignments in JSON ini file");
 
    } /* End if PWM mapped */
     

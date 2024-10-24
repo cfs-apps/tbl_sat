@@ -25,7 +25,7 @@
       "tables": ["tbl_sat_ini.json", "sat_ctrl_tbl.json"]
    },
 
-   "requires": ["osk_c_fw", "pi_iolib"]
+   "requires": ["osk_c_fw", "rpi_iolib"]
 
 }}
 

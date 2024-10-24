@@ -97,7 +97,7 @@ void SAT_CTRL_Constructor(SAT_CTRL_Class_t *SatCtrlPtr, INITBL_Class_t *IniTbl,
    {
       SatCtrl->GpioMapped = false;
       CFE_EVS_SendEvent (SAT_CTRL_CONSTRUCTOR_EID, CFE_EVS_EventType_ERROR, 
-                         "GPIO mapping failed. Verify chip selection in pi_iolib config.h");
+                         "GPIO mapping failed. Verify chip selection in rpi_iolib config.h");
 
    } /* End if IO mapped */
  

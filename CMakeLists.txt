@@ -7,7 +7,7 @@ include_directories(fsw/src)
 include_directories(${app_c_fw_MISSION_DIR}/fsw/app_inc)
 include_directories(${app_c_fw_MISSION_DIR}/fsw/platform_inc)
 include_directories(${app_c_fw_MISSION_DIR}/fsw/mission_inc)
-include_directories(${pi_iolib_MISSION_DIR}/src)
+include_directories(${rpi_iolib_MISSION_DIR}/src)
 
 aux_source_directory(fsw/src APP_SRC_FILES)
 
