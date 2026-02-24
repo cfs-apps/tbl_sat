@@ -115,7 +115,7 @@ bool MQTT_TOPIC_TBLSAT_CfeToJson(const char **JsonMsgPayload,
 ** Convert a JSON tblsat topic message to a cFE tblsat message 
 **
 ** Notes:
-**   1.  Signature must match MQTT_TOPIC_TBL_JsonToCfe_t
+**   1.  Signature must match JMSG_TOPIC_TBL_JsonToCfe_t
 */
 bool MQTT_TOPIC_TBLSAT_JsonToCfe(CFE_MSG_Message_t **CfeMsg, 
                                  const char *JsonMsgPayload, uint16 PayloadLen);
