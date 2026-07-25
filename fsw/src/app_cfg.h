@@ -47,12 +47,12 @@
 ** Versions:
 **
 ** 1.0 - Initial release
-** 2.0 - Compatible with Basecamp 4.0 and cFS 7.0
+** 3.1 - Compatible with Basecamp 3.x new app version management
 **
 */
 
-#define  TBL_SAT_MAJOR_VER   2
-#define  TBL_SAT_MINOR_VER   0
+#define  TBL_SAT_MAJOR_VER   3
+#define  TBL_SAT_MINOR_VER   1
 
 
 /******************************************************************************
